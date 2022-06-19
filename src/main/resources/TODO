@@ -1,0 +1,2 @@
+- add traceId to response. May be with pre/post filters
+- spring.application.name not being logged

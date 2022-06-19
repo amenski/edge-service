@@ -1,0 +1,41 @@
+app.version: '@project.version@'
+
+server:
+  shutdown: graceful
+  port: 8080
+  
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://localhost:8761/eureka
+    instance:
+      preferIpAddress: true
+     
+#==== spring related ======#
+spring:
+  profiles:
+    active: dev
+  application:
+    name: gateway
+  lifecycle:
+    timeout-per-shutdown-phase: "10s" # graceful shutdown, default is 30s
+  cloud:
+    gateway:
+      discovery:
+        locator:
+        # by enabling the discovery locator you can skip creating API Gateway routes manually. 
+        # And the ms will be accessed with http://{gateway-host}:{port}/{service-name-in-eureka}/{end-point}'
+        # OR if you have filters depending on ms, you can add them without any issues.
+          enabled: true
+          lower-case-service-id: true
+#      routes:
+#        - id: account-service
+#          uri: lb://account
+#          predicates:
+#            - Path=/account/**
+#        - id: sample-service
+#          uri: lb://sample
+#          predicates:
+#          - Path=/sample/**
+#          filters:
+#          - ResponseTraceIdEnhancerFilter
