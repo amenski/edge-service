@@ -104,7 +104,7 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
 
     private final Predicate<ServerHttpRequest> isSecured = request -> excludedUrls.stream().noneMatch(uri -> request.getURI().getPath().contains(uri));
 
-    // would have been better on a separate class. But, ordering might be a bit annoying, so this ended up here.
+    // would have been better on a separate class. But, ordering is a bit annoying, so this ended up here.
     private void enhanceResponseWithTransactionId(ServerWebExchange exchange) {
         brave.Span span = tracer.currentSpan();
         String traceId = span != null ? span.context().traceIdString() : "no_spanId_found";
