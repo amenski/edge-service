@@ -28,8 +28,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
 
-//https://medium.com/javarevisited/spring-boot-authorization-creating-an-authorization-server-for-your-microservices-50a3aefd6ce8
-
+/**
+ * Authentication filter + enhance response with transactionId
+ * 
+ * @author Aman
+ *
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -46,7 +50,7 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
 
     List<String> excludedUrls = List.of("/login"); // fetch this from property file
     
-    @Value("${token-validation-url:lb://account-service/api/v1/validateToken}")
+    @Value("${token-validation-url:lb://authentication-service/v1/validateToken}")
     private String tokenValidationUrl;
 
     @Override
@@ -59,7 +63,10 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
         if (isSecured.test(request)) {
             return webClientBuilder.build().get().uri(tokenValidationUrl)
                     .header(HttpHeaders.AUTHORIZATION, bearerToken)
-                    .retrieve().bodyToMono(ResponseBase.class)
+                    .header("X-Requested-Url", exchange.getRequest().getURI().getPath())
+                    .header("X-Requested-Url-http-method", exchange.getRequest().getMethodValue())
+                    .retrieve()
+                    .bodyToMono(ResponseBase.class)
                     .map(response ->  exchange)
                     .flatMap(chain::filter).onErrorResume(error -> {
                         log.info("Error validating authorization token.");
@@ -79,7 +86,7 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
 
     @Override
     public int getOrder() {
-        return 0;
+        return -1;
     }
 
     private Mono<Void> onError(ServerWebExchange exchange, HttpStatus httpStatus, String err, String errDetails) {
@@ -108,7 +115,6 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
     private void enhanceResponseWithTransactionId(ServerWebExchange exchange) {
         brave.Span span = tracer.currentSpan();
         String traceId = span != null ? span.context().traceIdString() : "no_spanId_found";
-        log.info("traceId: {}", traceId);
         exchange.getResponse().getHeaders().set(TX_HEADER, traceId);
     }
 }
