@@ -38,5 +38,7 @@
             <appender-ref ref="it.aman.gateway.default.file.appender" />
         </root>
     </springProfile>
-
+    
+     <logger name="org.apache" level="WARN"/>
+     <logger name="reactor.netty" level="WARN"/>
 </configuration>

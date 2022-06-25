@@ -39,3 +39,9 @@ spring:
 #          - Path=/sample/**
 #          filters:
 #          - ResponseTraceIdEnhancerFilter
+
+application:
+  token-validation-url: lb://authentication-service/v1/auth/validateToken
+  excluded-urls:
+    - /authentication-service/v1/auth
+    - /authentication-service/v1/auth/validateToken

@@ -1,11 +1,5 @@
 package it.aman.gateway.filter;
 
-import java.util.List;
-import java.util.function.Predicate;
-
-import javax.annotation.Resource;
-
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
@@ -23,6 +17,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import brave.Tracer;
+import it.aman.gateway.config.ApplicationProperties;
 import it.aman.gateway.util.ResponseBase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -39,19 +34,15 @@ import reactor.core.publisher.Mono;
 @RequiredArgsConstructor
 public class AuthenticationFilter implements GlobalFilter, Ordered {
 
-    private final WebClient.Builder webClientBuilder;
+    private final Tracer tracer;
 
     private final ObjectMapper objectMapper;
 
+    private final WebClient.Builder webClientBuilder;
+
+    private final ApplicationProperties applicationProperties;
+
     private static final String TX_HEADER = "X-Transaction-Id";
-
-    @Resource
-    private Tracer tracer;
-
-    List<String> excludedUrls = List.of("/login"); // fetch this from property file
-    
-    @Value("${token-validation-url:lb://authentication-service/v1/validateToken}")
-    private String tokenValidationUrl;
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
@@ -60,8 +51,8 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
         // add spanId as a transactionCode on each response
         enhanceResponseWithTransactionId(exchange);
         
-        if (isSecured.test(request)) {
-            return webClientBuilder.build().get().uri(tokenValidationUrl)
+        if (isSecured(request)) {
+            return webClientBuilder.build().get().uri(applicationProperties.getTokenValidationUrl())
                     .header(HttpHeaders.AUTHORIZATION, bearerToken)
                     .header("X-Requested-Url", exchange.getRequest().getURI().getPath())
                     .header("X-Requested-Url-http-method", exchange.getRequest().getMethodValue())
@@ -69,7 +60,7 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
                     .bodyToMono(ResponseBase.class)
                     .map(response ->  exchange)
                     .flatMap(chain::filter).onErrorResume(error -> {
-                        log.info("Error validating authorization token.");
+                        log.error("Error validating authorization token.");
                         HttpStatus httpStatus = HttpStatus.BAD_GATEWAY;
                         String errorMsg = HttpStatus.BAD_GATEWAY.getReasonPhrase();
                         if (error instanceof WebClientResponseException) {
@@ -109,8 +100,10 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
         return response.setComplete();
     }
 
-    private final Predicate<ServerHttpRequest> isSecured = request -> excludedUrls.stream().noneMatch(uri -> request.getURI().getPath().contains(uri));
-
+    private boolean isSecured(final ServerHttpRequest request) {
+        return applicationProperties.getExcludedUrls().stream().noneMatch(request.getURI().getPath()::equals);
+    }
+    
     // would have been better on a separate class. But, ordering is a bit annoying, so this ended up here.
     private void enhanceResponseWithTransactionId(ServerWebExchange exchange) {
         brave.Span span = tracer.currentSpan();
