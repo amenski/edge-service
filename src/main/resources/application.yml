@@ -21,6 +21,8 @@ spring:
     timeout-per-shutdown-phase: "10s" # graceful shutdown, default is 30s
   cloud:
     gateway:
+      default-filters:
+      - StripPrefix=1
       discovery:
         locator:
         # by enabling the discovery locator you can skip creating API Gateway routes manually. 
@@ -29,10 +31,10 @@ spring:
           enabled: true
           lower-case-service-id: true
 #      routes:
-#        - id: account-service
-#          uri: lb://account
+#        - id: employee-service
+#          uri: lb://employee-service
 #          predicates:
-#            - Path=/account/**
+#            - Path=/employee-service/**
 #        - id: sample-service
 #          uri: lb://sample
 #          predicates:

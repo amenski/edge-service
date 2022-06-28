@@ -17,6 +17,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import brave.Tracer;
+import it.aman.common.util.ERPConstants;
+import it.aman.common.util.StringUtils;
 import it.aman.gateway.config.ApplicationProperties;
 import it.aman.gateway.util.ResponseBase;
 import lombok.RequiredArgsConstructor;
@@ -42,25 +44,28 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
 
     private final ApplicationProperties applicationProperties;
 
-    private static final String TX_HEADER = "X-Transaction-Id";
-
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         ServerHttpRequest request = exchange.getRequest();
         String bearerToken = request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+        String subject = request.getHeaders().getFirst(ERPConstants.X_REQUESTED_URL_SUBJECT);
+        if(StringUtils.isBlank(subject)) {
+            subject = ERPConstants.ANONYMOUS_USER;
+        }
         // add spanId as a transactionCode on each response
         enhanceResponseWithTransactionId(exchange);
         
         if (isSecured(request)) {
             return webClientBuilder.build().get().uri(applicationProperties.getTokenValidationUrl())
                     .header(HttpHeaders.AUTHORIZATION, bearerToken)
-                    .header("X-Requested-Url", exchange.getRequest().getURI().getPath())
-                    .header("X-Requested-Url-http-method", exchange.getRequest().getMethodValue())
+                    .header(ERPConstants.X_REQUESTED_URL_SUBJECT, subject)
+                    .header(ERPConstants.X_REQUESTED_URL_HTTP_METHOD, exchange.getRequest().getMethodValue())
+                    .header(ERPConstants.X_REQUESTED_URL, removePredicateFromPath(exchange.getRequest().getURI().getPath()))
                     .retrieve()
                     .bodyToMono(ResponseBase.class)
-                    .map(response ->  exchange)
+                    .map(response -> exchange)
                     .flatMap(chain::filter).onErrorResume(error -> {
-                        log.error("Error validating authorization token.");
+                        log.error("Error validating authorization token: {}", error);
                         HttpStatus httpStatus = HttpStatus.BAD_GATEWAY;
                         String errorMsg = HttpStatus.BAD_GATEWAY.getReasonPhrase();
                         if (error instanceof WebClientResponseException) {
@@ -78,6 +83,15 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
     @Override
     public int getOrder() {
         return -1;
+    }
+    
+    private String removePredicateFromPath(String path) {
+        String[] split = path.substring(1).split("/");
+        StringBuilder builder = new StringBuilder();
+        for (int i=1; i < split.length; i++) {
+            builder.append("/").append(split[i]);
+        }
+        return builder.toString();
     }
 
     private Mono<Void> onError(ServerWebExchange exchange, HttpStatus httpStatus, String err, String errDetails) {
@@ -108,6 +122,6 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
     private void enhanceResponseWithTransactionId(ServerWebExchange exchange) {
         brave.Span span = tracer.currentSpan();
         String traceId = span != null ? span.context().traceIdString() : "no_spanId_found";
-        exchange.getResponse().getHeaders().set(TX_HEADER, traceId);
+        exchange.getResponse().getHeaders().set(ERPConstants.TRANSACTION_ID_KEY, traceId);
     }
 }
