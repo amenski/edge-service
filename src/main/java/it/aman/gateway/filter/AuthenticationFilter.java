@@ -60,7 +60,7 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
                     .header(HttpHeaders.AUTHORIZATION, bearerToken)
                     .header(ERPConstants.X_REQUESTED_URL_SUBJECT, subject)
                     .header(ERPConstants.X_REQUESTED_URL_HTTP_METHOD, exchange.getRequest().getMethodValue())
-                    .header(ERPConstants.X_REQUESTED_URL, removePredicateFromPath(exchange.getRequest().getURI().getPath()))
+                    .header(ERPConstants.X_REQUESTED_URL, exchange.getRequest().getURI().getPath())
                     .retrieve()
                     .bodyToMono(ResponseBase.class)
                     .map(response -> exchange)
@@ -83,15 +83,6 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
     @Override
     public int getOrder() {
         return -1;
-    }
-    
-    private String removePredicateFromPath(String path) {
-        String[] split = path.substring(1).split("/");
-        StringBuilder builder = new StringBuilder();
-        for (int i=1; i < split.length; i++) {
-            builder.append("/").append(split[i]);
-        }
-        return builder.toString();
     }
 
     private Mono<Void> onError(ServerWebExchange exchange, HttpStatus httpStatus, String err, String errDetails) {
