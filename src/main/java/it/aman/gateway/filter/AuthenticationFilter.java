@@ -75,6 +75,11 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
                         }
                         return onError(exchange, httpStatus, errorMsg, "Authentication Failed");
                     });
+        } else {
+            // TODO test
+            if(StringUtils.isNotBlank(bearerToken)) {
+                exchange.getRequest().getHeaders().remove(HttpHeaders.AUTHORIZATION);
+            }
         }
 
         return chain.filter(exchange);
