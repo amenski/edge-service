@@ -1,17 +1,21 @@
 package it.aman.gateway.filter;
 
+import org.springframework.boot.web.servlet.server.Session.Cookie;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
 import org.springframework.core.io.buffer.DataBufferFactory;
+import org.springframework.http.HttpCookie;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.stereotype.Component;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.server.ServerWebExchange;
+import org.springframework.web.util.WebUtils;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -47,18 +51,21 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         ServerHttpRequest request = exchange.getRequest();
-        String bearerToken = request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
-        String subject = request.getHeaders().getFirst(ERPConstants.X_REQUESTED_URL_SUBJECT);
+        String subject = request.getHeaders().getFirst(ERPConstants.X_REQUEST_URL_SUBJECT);
         if(StringUtils.isBlank(subject)) {
             subject = ERPConstants.ANONYMOUS_USER;
         }
         // add spanId as a transactionCode on each response
         enhanceResponseWithTransactionId(exchange);
         
+        final MultiValueMap<String, HttpCookie> cookies = request.getCookies();
+        HttpCookie httpCookie = cookies.getFirst("token");
+        final String bearer = httpCookie != null ? httpCookie.getValue() : "";
+        
         if (isSecured(request)) {
             return webClientBuilder.build().get().uri(applicationProperties.getTokenValidationUrl())
-                    .header(HttpHeaders.AUTHORIZATION, bearerToken)
-                    .header(ERPConstants.X_REQUESTED_URL_SUBJECT, subject)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + bearer)
+                    .header(ERPConstants.X_REQUEST_URL_SUBJECT, subject)
                     .header(ERPConstants.X_REQUESTED_URL_HTTP_METHOD, exchange.getRequest().getMethodValue())
                     .header(ERPConstants.X_REQUESTED_URL, exchange.getRequest().getURI().getPath())
                     .retrieve()
@@ -75,11 +82,6 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
                         }
                         return onError(exchange, httpStatus, errorMsg, "Authentication Failed");
                     });
-        } else {
-            // TODO test
-            if(StringUtils.isNotBlank(bearerToken)) {
-                exchange.getRequest().getHeaders().remove(HttpHeaders.AUTHORIZATION);
-            }
         }
 
         return chain.filter(exchange);
