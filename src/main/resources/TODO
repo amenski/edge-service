@@ -1,3 +1,2 @@
 - add traceId to response. May be with pre/post filters - done
-- spring.application.name not being logged
-- add 404 no handler mapping
+- add 404 no handler mapping - add generic json response handler - done

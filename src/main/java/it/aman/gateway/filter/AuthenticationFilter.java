@@ -57,8 +57,8 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
         enhanceResponseWithTransactionId(exchange);
         
         final MultiValueMap<String, HttpCookie> cookies = request.getCookies();
-        HttpCookie httpCookie = cookies.getFirst("token");
-        final String bearer = httpCookie != null ? httpCookie.getValue() : "";
+        HttpCookie httpTokenCookie = cookies.getFirst(ERPConstants.TOKEN);
+        final String bearer = httpTokenCookie != null ? httpTokenCookie.getValue() : "";
         
         if (isSecured(request)) {
             return webClientBuilder.build().get().uri(applicationProperties.getTokenValidationUrl())

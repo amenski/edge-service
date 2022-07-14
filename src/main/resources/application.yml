@@ -45,4 +45,5 @@ application:
   excluded-urls:
     - /authentication-service/v1/auth
     - /authentication-service/v1/auth/validateToken
+    - /authentication-service/v1/auth/refreshToken
     - /employee-service/employee/v1/retriable
